@@ -3,6 +3,12 @@ name: Release Knotpad
 on:
   repository_dispatch:
     types: [trigger-release-build]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag version to release (e.g., v0.2.4)'
+        required: true
+        default: 'v0.2.4'
 
 permissions:
   contents: write
@@ -23,13 +29,12 @@ jobs:
             arch: apple-silicon
 
     steps:
-      # Step 1: Clone the private source code using your token
       - name: Checkout Private Source Code
         uses: actions/checkout@v4
         with:
           repository: 'thillagen/knotpad'
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: ${{ github.event.client_payload.ref }}
+          ref: ${{ github.event.client_payload.ref || inputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -59,7 +64,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.client_payload.ref }}
+          tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
 
@@ -72,7 +77,7 @@ jobs:
         with:
           repository: 'thillagen/knotpad'
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: ${{ github.event.client_payload.ref }}
+          ref: ${{ github.event.client_payload.ref || inputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -100,7 +105,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.client_payload.ref }}
+          tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi
 
@@ -113,7 +118,7 @@ jobs:
         with:
           repository: 'thillagen/knotpad'
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: ${{ github.event.client_payload.ref }}
+          ref: ${{ github.event.client_payload.ref || inputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -146,7 +151,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.client_payload.ref }}
+          tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
 
@@ -165,13 +170,13 @@ jobs:
       - name: Get version
         id: version
         run: |
-          TAG="${{ github.event.client_payload.ref }}"
+          TAG="${{ github.event.client_payload.ref || inputs.tag }}"
           echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Download DMGs to calculate hashes
         run: |
-          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
-          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
+          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
+          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
 
       - name: Calculate SHA256 hashes
         id: hashes
