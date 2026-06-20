@@ -1,8 +1,15 @@
 cask "knotpad" do
   version "0.2.3"
-  sha256 :no_check
 
-  url "https://github.com/knotpad/homebrew-knotpad/releases/download/v#{version}/Knotpad_#{version}_x64.dmg"
+  on_intel do
+    sha256 :no_check
+    url "https://github.com/knotpad/homebrew-knotpad/releases/download/v#{version}/knotpad_#{version}_x64.dmg"
+  end
+
+  on_arm do
+    sha256 :no_check
+    url "https://github.com/knotpad/homebrew-knotpad/releases/download/v#{version}/knotpad_#{version}_aarch64.dmg"
+  end
 
   name "Knotpad"
   desc "Note-first project management with automatic task generation"
