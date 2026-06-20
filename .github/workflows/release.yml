@@ -1,0 +1,220 @@
+name: Release Knotpad
+
+on:
+  repository_dispatch:
+    types: [trigger-release-build]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            arch: intel
+          - target: aarch64-apple-darwin
+            arch: apple-silicon
+
+    steps:
+      # Step 1: Clone the private source code using your token
+      - name: Checkout Private Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'thillagen/knotpad'
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: ${{ github.event.client_payload.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        run: pnpm --filter ./apps/desktop tauri build --target ${{ matrix.target }}
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Upload to public releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.client_payload.ref }}
+          files: |
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Private Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'thillagen/knotpad'
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: ${{ github.event.client_payload.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        run: pnpm --filter ./apps/desktop tauri build
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Upload to public releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.client_payload.ref }}
+          files: |
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Private Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'thillagen/knotpad'
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: ${{ github.event.client_payload.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        run: pnpm --filter ./apps/desktop tauri build
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Upload to public releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.client_payload.ref }}
+          files: |
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+
+  update-formula:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout public repo
+        uses: actions/checkout@v4
+        with:
+          repository: knotpad/knotpad-release
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: knotpad-release
+
+      - name: Get version
+        id: version
+        run: |
+          TAG="${{ github.event.client_payload.ref }}"
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download DMGs to calculate hashes
+        run: |
+          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
+          curl -sfL "https://github.com/knotpad/knotpad-release/releases/download/${{ github.event.client_payload.ref }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
+
+      - name: Calculate SHA256 hashes
+        id: hashes
+        run: |
+          echo "AARCH64=$(shasum -a 256 aarch64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "X64=$(shasum -a 256 x64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Update formula
+        run: |
+          mkdir -p knotpad-release/Casks
+          cat > knotpad-release/Casks/knotpad.rb << 'EOF'
+          cask "knotpad" do
+            version "${{ steps.version.outputs.VERSION }}"
+
+            on_intel do
+              sha256 "${{ steps.hashes.outputs.X64 }}"
+              url "https://github.com/knotpad/knotpad-release/releases/download/v#{version}/knotpad_#{version}_x64.dmg"
+            end
+
+            on_arm do
+              sha256 "${{ steps.hashes.outputs.AARCH64 }}"
+              url "https://github.com/knotpad/knotpad-release/releases/download/v#{version}/knotpad_#{version}_aarch64.dmg"
+            end
+
+            name "Knotpad"
+            desc "Note-first project management with automatic task generation"
+            homepage "https://knotpad.app"
+
+            app "Knotpad.app"
+
+            zap trash: [
+              "~/Library/Application Support/knotpad",
+              "~/Library/Preferences/app.knotpad.plist",
+              "~/Library/Logs/knotpad",
+            ]
+          end
+          EOF
+
+      - name: Commit and push updated formula
+        run: |
+          cd knotpad-release
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/knotpad.rb
+          git commit -m "Update knotpad to ${{ steps.version.outputs.VERSION }}"
+          git push
