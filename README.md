@@ -1,8 +1,8 @@
 # Knotpad Releases & Distribution
 
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/knotpad/knotpad-release?color=7C3AED&label=latest%20release&style=flat-square)](https://github.com/knotpad/knotpad-release/releases)
-[![Platform support](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square&color=27272a)](https://github.com/knotpad/knotpad-release/releases)
-[![License](https://img.shields.io/badge/license-MIT-52525b?style=flat-square)](https://github.com/knotpad/knotpad-release/blob/master/LICENSE)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/knotpad/homebrew-tap?color=7C3AED&label=latest%20release&style=flat-square)](https://github.com/knotpad/homebrew-tap/releases)
+[![Platform support](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square&color=27272a)](https://github.com/knotpad/homebrew-tap/releases)
+[![License](https://img.shields.io/badge/license-MIT-52525b?style=flat-square)](https://github.com/knotpad/homebrew-tap/blob/main/LICENSE)
 
 This repository serves as the official distribution channel, Homebrew Cask tap, and auto-updater host for **Knotpad** — a note-first project management application for developers.
 
@@ -22,7 +22,7 @@ The easiest way to install and keep Knotpad up to date on macOS is via **Homebre
 
 ```bash
 # Tap the repository and install Knotpad in one command
-brew install --cask knotpad/knotpad-release/knotpad
+brew install --cask knotpad/tap/knotpad
 ```
 
 ---
@@ -32,9 +32,13 @@ You can also download the standalone .dmg installer directly from the Releases P
 
 Apple Silicon (M1/M2/M3): knotpad_{version}_aarch64.dmg
 Intel Mac: knotpad_{version}_x64.dmg
-TIP
 
-Gatekeeper Notice for Manual Installs: Because Knotpad runs entirely locally and is compiled independently, manual installations may trigger a macOS security prompt. To open the app, Right-click (Control-click) the app icon in your Applications folder and select Open.
+> [!TIP]
+> **Gatekeeper Notice for Standalone Installs:** Because Knotpad runs entirely locally and is compiled independently, manual installations may trigger a macOS security prompt. To open the app:
+> 
+> 1. Drag **Knotpad** into your **Applications** folder.
+> 2. **Right-click (or Ctrl+Click)** the app icon and select **Open**.
+> 3. Confirm by clicking **Open** in the dialog box.
 
 ---
 
@@ -47,6 +51,10 @@ Installer: knotpad_{version}_x64_en-US.msi
 
 ### Linux
 Download the latest .AppImage build from the Releases Page:
+
+```bash
+curl -fsSL https://knotpad.com/install.sh | sh
+```
 
 Standalone build: knotpad_{version}_amd64.AppImage
 bash
