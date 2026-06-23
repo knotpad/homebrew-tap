@@ -66,7 +66,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          repository: knotpad/homebrew-knotpad
+          repository: knotpad/homebrew-tap
           tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
@@ -110,7 +110,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          repository: knotpad/homebrew-knotpad
+          repository: knotpad/homebrew-tap
           tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi
@@ -158,7 +158,7 @@ jobs:
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
-          repository: knotpad/homebrew-knotpad
+          repository: knotpad/homebrew-tap
           tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: |
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
@@ -172,9 +172,9 @@ jobs:
       - name: Checkout public repo
         uses: actions/checkout@v4
         with:
-          repository: knotpad/homebrew-knotpad
+          repository: knotpad/homebrew-tap
           token: ${{ secrets.GITHUB_TOKEN }}
-          path: homebrew-knotpad
+          path: homebrew-tap
 
       - name: Get version
         id: version
@@ -184,8 +184,8 @@ jobs:
 
       - name: Download DMGs to calculate hashes
         run: |
-          curl -sfL "https://github.com/knotpad/homebrew-knotpad/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
-          curl -sfL "https://github.com/knotpad/homebrew-knotpad/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
+          curl -sfL "https://github.com/knotpad/homebrew-tap/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
+          curl -sfL "https://github.com/knotpad/homebrew-tap/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
 
       - name: Calculate SHA256 hashes
         id: hashes
@@ -195,26 +195,32 @@ jobs:
 
       - name: Update formula
         run: |
-          mkdir -p homebrew-knotpad/Casks
-          cat > homebrew-knotpad/Casks/knotpad.rb << 'EOF'
+          mkdir -p homebrew-tap/Casks
+          cat > homebrew-tap/Casks/knotpad.rb << 'EOF'
           cask "knotpad" do
             version "${{ steps.version.outputs.VERSION }}"
 
             on_intel do
               sha256 "${{ steps.hashes.outputs.X64 }}"
-              url "https://github.com/knotpad/homebrew-knotpad/releases/download/v#{version}/knotpad_#{version}_x64.dmg"
+              url "https://github.com/knotpad/homebrew-tap/releases/download/v#{version}/knotpad_#{version}_x64.dmg"
             end
 
             on_arm do
               sha256 "${{ steps.hashes.outputs.AARCH64 }}"
-              url "https://github.com/knotpad/homebrew-knotpad/releases/download/v#{version}/knotpad_#{version}_aarch64.dmg"
+              url "https://github.com/knotpad/homebrew-tap/releases/download/v#{version}/knotpad_#{version}_aarch64.dmg"
             end
 
             name "Knotpad"
             desc "Note-first project management with automatic task generation"
             homepage "https://knotpad.app"
 
+            auto_updates true
+
             app "Knotpad.app"
+
+            postflight do
+              system_command "xattr", args: ["-cr", "#{appdir}/Knotpad.app"]
+            end
 
             zap trash: [
               "~/Library/Application Support/knotpad",
@@ -226,14 +232,13 @@ jobs:
 
       - name: Commit and push updated formula
         run: |
-          cd homebrew-knotpad
+          cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/knotpad.rb
           git commit -m "Update knotpad to ${{ steps.version.outputs.VERSION }}"
           git push
 
-      # Generate the updater.json file dynamically from signatures
       - name: Generate updater.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -245,7 +250,7 @@ jobs:
             const token = process.env.GITHUB_TOKEN;
             const tag = process.env.TAG_NAME;
             const version = tag.replace(/^v/, '');
-            const repo = 'knotpad/homebrew-knotpad';
+            const repo = 'knotpad/homebrew-tap';
             
             const res = await fetch('https://api.github.com/repos/' + repo + '/releases/tags/' + tag, {
               headers: { Authorization: 'token ' + token }
@@ -304,6 +309,6 @@ jobs:
       - name: Upload updater.json to release
         uses: softprops/action-gh-release@v2
         with:
-          repository: knotpad/homebrew-knotpad
+          repository: knotpad/homebrew-tap
           tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
           files: updater.json
