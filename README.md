@@ -126,3 +126,13 @@ A native prompt will appear inside the desktop app offering to download and appl
 
 ## License
 Knotpad is distributed under the MIT License. Developed by Nexstrive Services.
+
+## Security & Privacy
+
+Since Knotpad runs as a desktop application with optional cloud sync, here is how your data and credentials are handled:
+- **Local-First**: By default, all your note-taking, task tracking, and workspace data are saved directly on your device.
+- **Secure Credential Storage**: Sensitive session keys and authentication credentials are saved securely in your operating system's native credential store, never in insecure browser storage.
+- **Optional Cloud Sync**: Cloud synchronization is fully opt-in. If enabled, your data is transferred using secure encryption protocols and stored encrypted-at-rest.
+- **Disclaimer**: Knotpad is provided "as is" and "as available", without warranty of any kind, express or implied.
+
+For more details, please read our [Terms of Service](https://knotpad.app/terms) and [Privacy Policy](https://knotpad.app/privacy).
