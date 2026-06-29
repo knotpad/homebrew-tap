@@ -69,7 +69,17 @@ jobs:
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
+          
+      - name: Calculate SHA256 Hash
+        run: |
+          shasum -a 256 apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg | cut -d' ' -f1 > ${{ matrix.arch }}_hash.txt
 
+      - name: Upload Hash Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-hash
+          path: ${{ matrix.arch }}_hash.txt
+          
       - name: Upload to public releases
         uses: softprops/action-gh-release@v2
         with:
@@ -207,17 +217,17 @@ jobs:
           TAG="${{ github.event.client_payload.ref || inputs.tag }}"
           echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
-      - name: Download DMGs to calculate hashes
-        run: |
-          curl -sfL "https://github.com/knotpad/homebrew-tap/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_aarch64.dmg" -o aarch64.dmg
-          curl -sfL "https://github.com/knotpad/homebrew-tap/releases/download/${{ github.event.client_payload.ref || inputs.tag }}/knotpad_${{ steps.version.outputs.VERSION }}_x64.dmg" -o x64.dmg
+      - name: Download Hash Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: hashes
 
-      - name: Calculate SHA256 hashes
+      - name: Read SHA256 Hashes
         id: hashes
         run: |
-          echo "AARCH64=$(shasum -a 256 aarch64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          echo "X64=$(shasum -a 256 x64.dmg | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-
+          echo "AARCH64=$(cat hashes/macos-apple-silicon-hash/apple-silicon_hash.txt)" >> $GITHUB_OUTPUT
+          echo "X64=$(cat hashes/macos-intel-hash/intel_hash.txt)" >> $GITHUB_OUTPUT
+          
       - name: Update formula
         run: |
           mkdir -p homebrew-tap/Casks
