@@ -1,13 +1,13 @@
 cask "knotpad" do
-  version "1.5.1"
+  version "1.5.2"
 
   on_intel do
-    sha256 "048731cba98b0a13054f6f96ca1210dbcdaf22643df8d334a12021228418566b"
+    sha256 "235c04284ffdfdd4a92062a3ec5d006bd6aeb715c8a13e107e7bae2b067b6707"
     url "https://github.com/knotpad/homebrew-tap/releases/download/v#{version}/knotpad_#{version}_x64.dmg"
   end
 
   on_arm do
-    sha256 "532ae065135f9ba099df8623bbe391fb3480b23ca71c2301e396af95b9d08f63"
+    sha256 "a7971db7d00ad198c5f5b602eaaadf8ade6f50e2d73f38021c5173835c4467bc"
     url "https://github.com/knotpad/homebrew-tap/releases/download/v#{version}/knotpad_#{version}_aarch64.dmg"
   end
 
