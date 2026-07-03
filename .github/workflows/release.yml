@@ -198,6 +198,7 @@ jobs:
           files: |
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
 
   update-formula:
     needs: [build-macos, build-windows, build-linux]
