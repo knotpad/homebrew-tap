@@ -19,7 +19,7 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
-      - name: Test JSON Parse
+      - name: Inspect msstore output
         shell: pwsh
         run: |
           node -e "
@@ -30,12 +30,23 @@ jobs:
             { encoding: 'utf8' }
           );
       
-          console.log('Parsing JSON...');
+          console.log('Length:', out.length);
       
-          const json = JSON.parse(out);
+          const pos = 562;
       
-          console.log('SUCCESS!');
-          console.log('Title:', json.Listings['en-us'].BaseListing.Title);
-          console.log('Current Release Notes:');
-          console.log(json.Listings['en-us'].BaseListing.ReleaseNotes);
+          console.log('----- Around Error -----');
+          console.log(out.substring(pos - 120, pos + 120));
+          console.log('------------------------');
+      
+          const chars = [];
+      
+          for (let i = pos - 20; i < pos + 20; i++) {
+            chars.push({
+              index: i,
+              char: JSON.stringify(out[i]),
+              code: out.charCodeAt(i)
+            });
+          }
+      
+          console.table(chars);
           "
