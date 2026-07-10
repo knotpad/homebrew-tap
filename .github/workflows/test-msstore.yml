@@ -19,11 +19,18 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
-      - name: Test CLI
+      - name: Test Node output
         shell: pwsh
         run: |
-          msstore --version
-
-          msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
-
-          Write-Host "Exit Code: $LASTEXITCODE"
+          node -e "
+            const { execSync } = require('child_process');
+      
+            const out = execSync(
+              'msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}',
+              { encoding: 'utf8' }
+            );
+      
+            console.log('-----RAW START-----');
+            console.log(out);
+            console.log('-----RAW END-----');
+          "
