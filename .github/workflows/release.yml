@@ -198,27 +198,36 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
+      # 6. Retrieve, edit, and update the "What's new" release notes for your Store listing
       - name: Update Store Release Notes
         run: |
+          # Fetch the current draft/submission listings schema
           msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} | Out-File -Encoding utf8 submission.json
-          $TAG = "${{ github.event.client_payload.ref || inputs.tag }}"
-          $releaseNotes = "Knotpad version $TAG release. Fixed bugs, performance enhancements, and productivity features."
-          $json = Get-Content -Raw submission.json | ConvertFrom-Json
-          if ($json.listings) {
-              foreach ($prop in $json.listings.psobject.Properties) {
-                  $prop.Value.releaseNotes = $releaseNotes
-              }
+          
+          # Inject release notes into the JSON listings using an inline Node.js script
+          node -e "
+          const fs = require('fs');
+          const json = JSON.parse(fs.readFileSync('submission.json', 'utf8'));
+          const tag = '${{ github.event.client_payload.ref || inputs.tag }}';
+          const releaseNotes = 'Knotpad version ' + tag + ' release. Fixed bugs, performance enhancements, and productivity features.';
+          if (json.listings) {
+            for (const key in json.listings) {
+              json.listings[key].releaseNotes = releaseNotes;
+            }
           }
-          $json | ConvertTo-Json -Depth 20 | Set-Content -Path submission.json -Encoding utf8
+          fs.writeFileSync('submission.json', JSON.stringify(json, null, 2), 'utf8');
+          "
+          
+          # Upload the updated listings metadata back to Partner Center
           msstore submission updateMetadata ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} submission.json
-        shell: pwsh
 
+      # 7. Publish the generated MSIX package directory to the Store
       - name: Publish MSIX to Microsoft Store
         run: |
           msstore publish `
             --input apps/desktop/src-tauri/target/msix `
             --productId ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
-
+            
   build-linux:
     runs-on: ubuntu-latest
 
