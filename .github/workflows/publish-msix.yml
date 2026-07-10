@@ -1,0 +1,108 @@
+name: Publish MSIX to Microsoft Store (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag version to release (e.g., v1.7.1)'
+        required: true
+        default: 'v1.7.1'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_INCREMENTAL: 0
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+jobs:
+  publish-msix:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Private Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'thillagen/knotpad'
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: ${{ inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Patch version from input tag
+        run: |
+          $TAG = "${{ inputs.tag }}"
+          $VERSION = $TAG -replace '^v', ''
+          $json = Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $json.version = $VERSION
+          $json | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
+          echo "Patched version → $VERSION"
+        shell: pwsh
+
+      # 1. Build the MSIX package for the Store
+      - name: Build MSIX Package
+        run: node scripts/build-msix.js
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      # 2. Setup MSStore CLI on the runner
+      - name: Setup MSStore CLI
+        uses: microsoft/microsoft-store-apppublisher@v1
+
+      # 3. Authenticate CLI using secrets
+      - name: Configure Store Credentials
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.PARTNER_CENTER_TENANT_ID }} `
+            --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }} `
+            --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
+            --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+      # 4. Fetch, update release notes, and save as clean JSON (using Node to prevent PowerShell wrapping/BOM issues)
+      - name: Update Store Release Notes
+        run: |
+          node -e "
+          const { execSync } = require('child_process');
+          const fs = require('fs');
+          const productId = '${{ secrets.PARTNER_CENTER_PRODUCT_ID }}';
+          const tag = '${{ inputs.tag }}';
+          
+          console.log('Fetching current submission listings...');
+          const stdout = execSync('msstore submission get ' + productId, { encoding: 'utf8' }).trim();
+          
+          const json = JSON.parse(stdout);
+          const releaseNotes = 'Knotpad version ' + tag + ' release. Fixed bugs, performance enhancements, and productivity features.';
+          if (json.listings) {
+            for (const key in json.listings) {
+              json.listings[key].releaseNotes = releaseNotes;
+            }
+          }
+          fs.writeFileSync('submission.json', JSON.stringify(json), 'utf8');
+          "
+          
+          # Read and apply the updated listings metadata back to Partner Center
+          $metadata = Get-Content -Raw submission.json
+          msstore submission updateMetadata ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} $metadata
+        shell: pwsh
+
+      # 5. Publish the generated MSIX package directory
+      - name: Publish MSIX to Microsoft Store
+        run: |
+          msstore publish `
+            --input apps/desktop/src-tauri/target/msix `
+            --productId ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
