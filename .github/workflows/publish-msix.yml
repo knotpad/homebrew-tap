@@ -73,48 +73,8 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
-      # 4. Test Microsoft Store CLI
-      - name: Test Microsoft Store CLI
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Continue"
-
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "MSStore Version"
-          Write-Host "========================================"
-          msstore --version
-
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "Current Directory"
-          Write-Host "========================================"
-          Get-Location
-
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "Fetch Submission"
-          Write-Host "========================================"
-
-          msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
-
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "Exit Code"
-          Write-Host "========================================"
-          Write-Host $LASTEXITCODE
-          
-      - name: Upload debug artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: msstore-debug
-          path: |
-            raw-submission.txt
-            broken-json.txt
-            submission.json
             
-      # 5. Publish the generated MSIX package directory
+      # 4. Publish the generated MSIX package directory
       - name: Publish MSIX to Microsoft Store
         run: |
           msstore publish `
