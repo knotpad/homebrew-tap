@@ -73,33 +73,98 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
-      # 4. Fetch, update release notes, and save as clean JSON (using Node to prevent PowerShell wrapping/BOM issues)
+      # 4. Fetch, update release notes, and save as clean JSON
       - name: Update Store Release Notes
+        shell: pwsh
         run: |
           node -e "
           const { execSync } = require('child_process');
           const fs = require('fs');
+
           const productId = '${{ secrets.PARTNER_CENTER_PRODUCT_ID }}';
           const tag = '${{ inputs.tag }}';
-          
-          console.log('Fetching current submission listings...');
-          const stdout = execSync('msstore submission get ' + productId, { encoding: 'utf8' }).trim();
-          
-          const json = JSON.parse(stdout);
-          const releaseNotes = 'Knotpad version ' + tag + ' release. Fixed bugs, performance enhancements, and productivity features.';
-          if (json.listings) {
-            for (const key in json.listings) {
-              json.listings[key].releaseNotes = releaseNotes;
-            }
-          }
-          fs.writeFileSync('submission.json', JSON.stringify(json), 'utf8');
-          "
-          
-          # Read and apply the updated listings metadata back to Partner Center
-          $metadata = Get-Content -Raw submission.json
-          msstore submission updateMetadata ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} $metadata
-        shell: pwsh
 
+          console.log('Fetching current submission listings...');
+
+          let stdout;
+
+          try {
+              stdout = execSync(
+                  'msstore submission get ' + productId,
+                  {
+                      encoding: 'utf8',
+                      maxBuffer: 20 * 1024 * 1024
+                  }
+              );
+          } catch (err) {
+              console.error('msstore command failed');
+              console.error(err.stdout?.toString() || '');
+              console.error(err.stderr?.toString() || '');
+              throw err;
+          }
+
+          // Save the raw response exactly as returned by msstore
+          fs.writeFileSync('raw-submission.txt', stdout, 'utf8');
+
+          console.log('----- BEGIN RAW OUTPUT (first 1500 chars) -----');
+          console.log(stdout.substring(0, 1500));
+          console.log('----- END RAW OUTPUT -----');
+
+          let json;
+
+          try {
+              json = JSON.parse(stdout);
+          } catch (err) {
+              console.error('');
+              console.error('JSON PARSE FAILED');
+              console.error(err.message);
+
+              fs.writeFileSync('broken-json.txt', stdout, 'utf8');
+
+              throw err;
+          }
+
+          const releaseNotes =
+              'Knotpad version ' +
+              tag +
+              ' release. Fixed bugs, performance enhancements, and productivity features.';
+
+          if (json.listings) {
+              for (const key of Object.keys(json.listings)) {
+                  json.listings[key].releaseNotes = releaseNotes;
+              }
+          }
+
+          fs.writeFileSync(
+              'submission.json',
+              JSON.stringify(json, null, 2),
+              'utf8'
+          );
+
+          console.log('submission.json created successfully.');
+          "
+
+          if (-not (Test-Path submission.json)) {
+            Write-Host "submission.json was not created."
+            exit 1
+          }
+
+          $metadata = Get-Content -Raw submission.json
+
+          msstore submission updateMetadata `
+            ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} `
+            $metadata
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msstore-debug
+          path: |
+            raw-submission.txt
+            broken-json.txt
+            submission.json
+            
       # 5. Publish the generated MSIX package directory
       - name: Publish MSIX to Microsoft Store
         run: |
