@@ -91,7 +91,8 @@ jobs:
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
 
-  build-windows:
+  # Job 1: Build the standalone .msi installer and push to GitHub Release
+  build-windows-msi:
     runs-on: windows-latest
 
     steps:
@@ -127,21 +128,12 @@ jobs:
           echo "Patched version → $VERSION"
         shell: pwsh
 
-      # 1. Build the standalone installer (.msi) with manual updater enabled
       - name: Build Standalone MSI Installer
         run: pnpm --filter ./apps/desktop tauri build
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
 
-      # 2. Build the Store MSIX package (build-msix.js handles the custom feature flags)
-      - name: Build MSIX Package
-        run: node scripts/build-msix.js
-        env:
-          CI: true
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
-      # 3. Upload standalone MSI installer to GitHub Releases
       - name: Upload Standalone MSI to public releases
         uses: softprops/action-gh-release@v2
         with:
@@ -152,11 +144,52 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi.sig
 
-      # 4. Setup MSStore CLI on the runner
+  # Job 2: Build the Store-ready .msix bundle and publish to Microsoft Store
+  build-windows-msix:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Private Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: 'thillagen/knotpad'
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: ${{ github.event.client_payload.ref || inputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Patch version from tag
+        run: |
+          $TAG = "${{ github.event.client_payload.ref || inputs.tag }}"
+          $VERSION = $TAG -replace '^v', ''
+          $json = Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $json.version = $VERSION
+          $json | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
+          echo "Patched version → $VERSION"
+        shell: pwsh
+
+      - name: Build MSIX Package
+        run: node scripts/build-msix.js
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
       - name: Setup MSStore CLI
         uses: microsoft/microsoft-store-apppublisher@v1
 
-      # 5. Authenticate CLI using secrets
       - name: Configure Store Credentials
         run: |
           msstore reconfigure `
@@ -165,16 +198,11 @@ jobs:
             --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
             --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
-      # 6. Retrieve, edit, and update the "What's new" release notes for your Store listing
       - name: Update Store Release Notes
         run: |
-          # Fetch the current draft/submission listings schema
           msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} | Out-File -Encoding utf8 submission.json
-          
-          # Inject release notes into the JSON listings dynamically for all languages
           $TAG = "${{ github.event.client_payload.ref || inputs.tag }}"
           $releaseNotes = "Knotpad version $TAG release. Fixed bugs, performance enhancements, and productivity features."
-          
           $json = Get-Content -Raw submission.json | ConvertFrom-Json
           if ($json.listings) {
               foreach ($prop in $json.listings.psobject.Properties) {
@@ -182,12 +210,9 @@ jobs:
               }
           }
           $json | ConvertTo-Json -Depth 20 | Set-Content -Path submission.json -Encoding utf8
-          
-          # Upload the updated listings metadata back to Partner Center
           msstore submission updateMetadata ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} submission.json
         shell: pwsh
 
-      # 7. Publish the generated MSIX package directory
       - name: Publish MSIX to Microsoft Store
         run: |
           msstore publish `
@@ -252,7 +277,7 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
 
   update-formula:
-    needs: [build-macos, build-windows, build-linux]
+    needs: [build-macos, build-windows-msi, build-windows-msix, build-linux]
     runs-on: ubuntu-latest
 
     steps:
