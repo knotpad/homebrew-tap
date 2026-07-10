@@ -127,13 +127,22 @@ jobs:
           echo "Patched version → $VERSION"
         shell: pwsh
 
-      - name: Build Tauri app
+      # 1. Build the standalone installer (.msi) with manual updater enabled
+      - name: Build Standalone MSI Installer
         run: pnpm --filter ./apps/desktop tauri build
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
 
-      - name: Upload to public releases
+      # 2. Build the Store MSIX package (build-msix.js handles the custom feature flags)
+      - name: Build MSIX Package
+        run: node scripts/build-msix.js
+        env:
+          CI: true
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      # 3. Upload standalone MSI installer to GitHub Releases
+      - name: Upload Standalone MSI to public releases
         uses: softprops/action-gh-release@v2
         with:
           repository: knotpad/homebrew-tap
@@ -142,6 +151,48 @@ jobs:
           files: |
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi
             apps/desktop/src-tauri/target/release/bundle/msi/*.msi.sig
+
+      # 4. Setup MSStore CLI on the runner
+      - name: Setup MSStore CLI
+        uses: microsoft/microsoft-store-apppublisher@v1
+
+      # 5. Authenticate CLI using secrets
+      - name: Configure Store Credentials
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.PARTNER_CENTER_TENANT_ID }} `
+            --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }} `
+            --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
+            --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+      # 6. Retrieve, edit, and update the "What's new" release notes for your Store listing
+      - name: Update Store Release Notes
+        run: |
+          # Fetch the current draft/submission listings schema
+          msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} | Out-File -Encoding utf8 submission.json
+          
+          # Inject release notes into the JSON listings dynamically for all languages
+          $TAG = "${{ github.event.client_payload.ref || inputs.tag }}"
+          $releaseNotes = "Knotpad version $TAG release. Fixed bugs, performance enhancements, and productivity features."
+          
+          $json = Get-Content -Raw submission.json | ConvertFrom-Json
+          if ($json.listings) {
+              foreach ($prop in $json.listings.psobject.Properties) {
+                  $prop.Value.releaseNotes = $releaseNotes
+              }
+          }
+          $json | ConvertTo-Json -Depth 20 | Set-Content -Path submission.json -Encoding utf8
+          
+          # Upload the updated listings metadata back to Partner Center
+          msstore submission updateMetadata ${{ secrets.PARTNER_CENTER_PRODUCT_ID }} submission.json
+        shell: pwsh
+
+      # 7. Publish the generated MSIX package directory
+      - name: Publish MSIX to Microsoft Store
+        run: |
+          msstore publish `
+            --input apps/desktop/src-tauri/target/msix `
+            --productId ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
 
   build-linux:
     runs-on: ubuntu-latest
