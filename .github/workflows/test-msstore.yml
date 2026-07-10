@@ -1,0 +1,29 @@
+name: Test Microsoft Store CLI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - uses: microsoft/microsoft-store-apppublisher@v1
+
+      - name: Configure Store Credentials
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.PARTNER_CENTER_TENANT_ID }} `
+            --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }} `
+            --clientId ${{ secrets.PARTNER_CENTER_CLIENT_ID }} `
+            --clientSecret ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+      - name: Test CLI
+        shell: pwsh
+        run: |
+          msstore --version
+
+          msstore submission get ${{ secrets.PARTNER_CENTER_PRODUCT_ID }}
+
+          Write-Host "Exit Code: $LASTEXITCODE"
