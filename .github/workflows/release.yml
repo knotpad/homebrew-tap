@@ -62,6 +62,7 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' \
             apps/desktop/src-tauri/tauri.conf.json > tmp.json \
             && mv tmp.json apps/desktop/src-tauri/tauri.conf.json
+          VERSION="$VERSION" node -e "const fs=require('fs');const p='apps/desktop/src-tauri/Cargo.toml';let t=fs.readFileSync(p,'utf8');t=t.replace(/^version = \".*\"/m,'version = \"'+process.env.VERSION+'\"');fs.writeFileSync(p,t);"
           echo "Patched version → $VERSION"
 
       - name: Build Tauri app
@@ -125,6 +126,7 @@ jobs:
           $json = Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
           $json.version = $VERSION
           $json | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
+          (Get-Content apps/desktop/src-tauri/Cargo.toml) -replace '^version = ".*"', "version = `"$VERSION`"" | Set-Content apps/desktop/src-tauri/Cargo.toml
           echo "Patched version → $VERSION"
         shell: pwsh
 
@@ -183,6 +185,7 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' \
             apps/desktop/src-tauri/tauri.conf.json > tmp.json \
             && mv tmp.json apps/desktop/src-tauri/tauri.conf.json
+          VERSION="$VERSION" node -e "const fs=require('fs');const p='apps/desktop/src-tauri/Cargo.toml';let t=fs.readFileSync(p,'utf8');t=t.replace(/^version = \".*\"/m,'version = \"'+process.env.VERSION+'\"');fs.writeFileSync(p,t);"
           echo "Patched version → $VERSION"
 
       - name: Build Tauri app
@@ -203,7 +206,7 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
 
   update-formula:
-    needs: [build-macos, build-windows-msi, build-windows-msix, build-linux]
+    needs: [build-macos, build-windows-msi, build-linux]
     runs-on: ubuntu-latest
 
     steps:
