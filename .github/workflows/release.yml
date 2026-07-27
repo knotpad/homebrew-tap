@@ -92,60 +92,6 @@ jobs:
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
 
-  # Job 1: Build the standalone .msi installer and push to GitHub Release
-  build-windows-msi:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout Private Source Code
-        uses: actions/checkout@v4
-        with:
-          repository: 'thillagen/knotpad'
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: ${{ github.event.client_payload.ref || inputs.tag }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Patch version from tag
-        run: |
-          $TAG = "${{ github.event.client_payload.ref || inputs.tag }}"
-          $VERSION = $TAG -replace '^v', ''
-          $json = Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
-          $json.version = $VERSION
-          $json | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
-          (Get-Content apps/desktop/src-tauri/Cargo.toml) -replace '^version = ".*"', "version = `"$VERSION`"" | Set-Content apps/desktop/src-tauri/Cargo.toml
-          echo "Patched version → $VERSION"
-        shell: pwsh
-
-      - name: Build Standalone MSI Installer
-        run: pnpm --filter ./apps/desktop tauri build
-        env:
-          CI: true
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
-      - name: Upload Standalone MSI to public releases
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: knotpad/homebrew-tap
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
-          files: |
-            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
-            apps/desktop/src-tauri/target/release/bundle/msi/*.msi.sig
-
              
   build-linux:
     runs-on: ubuntu-latest
@@ -206,7 +152,7 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
 
   update-formula:
-    needs: [build-macos, build-windows-msi, build-linux]
+    needs: [build-macos,build-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -321,8 +267,6 @@ jobs:
                   platformKey = 'darwin-x86_64';
                 } else if (targetName.includes('amd64') && targetName.endsWith('.AppImage')) {
                   platformKey = 'linux-x86_64';
-                } else if (targetName.includes('x64') && targetName.endsWith('.msi')) {
-                  platformKey = 'windows-x86_64';
                 }
 
                 if (platformKey) {
