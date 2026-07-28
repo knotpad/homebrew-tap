@@ -27,8 +27,10 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             arch: intel
+            updater_arch: x64
           - target: aarch64-apple-darwin
             arch: apple-silicon
+            updater_arch: aarch64
 
     steps:
       - name: Checkout Private Source Code
@@ -71,6 +73,24 @@ jobs:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
           
+      # Tauri emits the macOS updater artifact as an arch-less "knotpad.app.tar.gz".
+      # Both matrix jobs uploading that name to one release would clobber each other,
+      # and the updater.json generator derives the platform key (darwin-x86_64 /
+      # darwin-aarch64) from the filename — so rename per arch before uploading.
+      - name: Rename updater artifacts per arch
+        run: |
+          TAG="${{ github.event.client_payload.ref || inputs.tag }}"
+          VERSION="${TAG#v}"
+          BUNDLE_DIR="apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+          ls -la "$BUNDLE_DIR"
+          for f in "$BUNDLE_DIR"/*.app.tar.gz; do
+            mv "$f" "$BUNDLE_DIR/knotpad_${VERSION}_${{ matrix.updater_arch }}.app.tar.gz"
+          done
+          for f in "$BUNDLE_DIR"/*.app.tar.gz.sig; do
+            mv "$f" "$BUNDLE_DIR/knotpad_${VERSION}_${{ matrix.updater_arch }}.app.tar.gz.sig"
+          done
+          ls -la "$BUNDLE_DIR"
+
       - name: Calculate SHA256 Hash
         run: |
           shasum -a 256 apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg | cut -d' ' -f1 > ${{ matrix.arch }}_hash.txt
