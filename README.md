@@ -1,7 +1,7 @@
 # Knotpad Releases & Distribution
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/knotpad/homebrew-tap?color=7C3AED&label=latest%20release&style=flat-square)](https://github.com/knotpad/homebrew-tap/releases)
-[![Platform support](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square&color=27272a)](https://github.com/knotpad/homebrew-tap/releases)
+[![Platform support](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue?style=flat-square&color=27272a)](https://github.com/knotpad/homebrew-tap/releases)
 [![License](https://img.shields.io/badge/license-MIT-52525b?style=flat-square)](https://github.com/knotpad/homebrew-tap/blob/main/LICENSE)
 
 This repository serves as the official distribution channel, Homebrew Cask tap, and auto-updater host for **Knotpad** — a note-first project management application for developers.
@@ -48,7 +48,7 @@ Knotpad exposes a full **Model Context Protocol (MCP)** server. Connect any MCP-
 - **Team workspaces** — owner pays per seat, teammates join free
 - **Cloud-only notes** — access revoked instantly when a member leaves
 - **Multi-agent support** — multiple agents work the same workspace without collisions
-- **Cross-platform** — macOS (Homebrew), Windows (.msi), Linux (.AppImage)
+- **Desktop apps:** Windows (Microsoft Store) and macOS (Homebrew). No Linux build at the moment.
 - **Auto-updater** built in via Tauri
 
 ---
@@ -58,8 +58,8 @@ Knotpad exposes a full **Model Context Protocol (MCP)** server. Connect any MCP-
 | Plan | Price | Notes |
 |---|---|---|
 | Personal | $0 | Local only, No limit on Features |
-| Personal Pro | $5/mo | Cloud sync + Multi Device |
-| Team Pro | $5/seat/mo | Shared workspace |
+| Personal Pro | $9/month or $90/year | Cloud sync + Multi Device |
+| Team Pro | $12/seat/month or $120/seat/year (2 to 50 seats) | Shared workspace |
 
 [→ Full details at knotpad.app](https://knotpad.app)
 
@@ -93,27 +93,12 @@ Intel Mac: knotpad_{version}_x64.dmg
 ---
 
 ### Windows
-Download the latest .msi setup file from the Releases Page:
-
-Installer: knotpad_{version}_x64_en-US.msi
+Install Knotpad from the [Microsoft Store](https://apps.microsoft.com/detail/9P002G3S58VQ). The Store keeps it up to date.
 
 ---
 
 ### Linux
-Download the latest .AppImage build from the Releases Page:
-
-```bash
-curl -fsSL https://knotpad.com/install.sh | sh
-```
-
-Standalone build: knotpad_{version}_amd64.AppImage
-bash
-
-```
-# Make the download executable and run
-chmod +x knotpad_{version}_amd64.AppImage
-./knotpad_{version}_amd64.AppImage
-```
+There is no Linux build at the moment. You can use Knotpad in the browser at [knotpad.app](https://knotpad.app). Releases up to v1.9.25 still have their Linux files, but they cannot remember your sign-in.
 
 ---
 

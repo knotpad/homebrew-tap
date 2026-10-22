@@ -112,67 +112,11 @@ jobs:
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
             apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig
 
-             
-  build-linux:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Private Source Code
-        uses: actions/checkout@v4
-        with:
-          repository: 'thillagen/knotpad'
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ref: ${{ github.event.client_payload.ref || inputs.tag }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Patch version from tag
-        run: |
-          TAG="${{ github.event.client_payload.ref || inputs.tag }}"
-          VERSION="${TAG#v}"
-          jq --arg v "$VERSION" '.version = $v' \
-            apps/desktop/src-tauri/tauri.conf.json > tmp.json \
-            && mv tmp.json apps/desktop/src-tauri/tauri.conf.json
-          VERSION="$VERSION" node -e "const fs=require('fs');const p='apps/desktop/src-tauri/Cargo.toml';let t=fs.readFileSync(p,'utf8');t=t.replace(/^version = \".*\"/m,'version = \"'+process.env.VERSION+'\"');fs.writeFileSync(p,t);"
-          echo "Patched version → $VERSION"
-
-      - name: Build Tauri app
-        run: pnpm --filter ./apps/desktop tauri build
-        env:
-          CI: true
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
-      - name: Upload to public releases
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: knotpad/homebrew-tap
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.event.client_payload.ref || inputs.tag }}
-          files: |
-            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
-            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+  # No Linux job since v1.9.26 (decision D-1): the app has no Linux keyring
+  # backend, so a Linux install could never remember its sign-in.
 
   update-formula:
-    needs: [build-macos,build-linux]
+    needs: [build-macos]
     runs-on: ubuntu-latest
 
     steps:
@@ -285,8 +229,6 @@ jobs:
                   platformKey = 'darwin-aarch64';
                 } else if (targetName.includes('x64') && targetName.endsWith('.app.tar.gz')) {
                   platformKey = 'darwin-x86_64';
-                } else if (targetName.includes('amd64') && targetName.endsWith('.AppImage')) {
-                  platformKey = 'linux-x86_64';
                 }
 
                 if (platformKey) {
